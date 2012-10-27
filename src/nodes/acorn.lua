@@ -3,6 +3,8 @@ local Timer = require 'vendor/timer'
 local cheat = require 'cheat'
 local sound = require 'vendor/TEsound'
 local coin = require 'nodes/coin'
+local acornItem = require 'items/acornItem'
+local controls = require 'controls'
 
 local Acorn = {}
 Acorn.__index = Acorn
@@ -136,11 +138,16 @@ function Acorn:update(dt, player)
     self:animation():update(dt)
 
     if self.state == 'dying' or self.state == 'dyingfury' then
-        return
+        if controls.isDown( 'UP' ) then
+            local item = acornItem.new()
+        if player.inventory:addItem(item) then
+            self.exists = false
+        end
+    end
     end
 
     if self.state == 'fury' then
-        rage_velocity = 7
+        rage_velocity = 4
      else
         rage_velocity = 1
         max = 1
@@ -174,9 +181,7 @@ function Acorn:update(dt, player)
 end
 
 function Acorn:draw()
-    if not self.dead then
-        self:animation():draw( sprite, math.floor( self.position.x ), math.floor( self.position.y ) )
-    end
+    self:animation():draw( sprite, math.floor( self.position.x ), math.floor( self.position.y ) )
 
     for _,c in pairs(self.coins) do
         c:draw()
