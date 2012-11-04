@@ -3,8 +3,6 @@ local Timer = require 'vendor/timer'
 local cheat = require 'cheat'
 local sound = require 'vendor/TEsound'
 local coin = require 'nodes/coin'
-local acornItem = require 'items/acornItem'
-local controls = require 'controls'
 
 local Acorn = {}
 Acorn.__index = Acorn
@@ -87,40 +85,43 @@ function Acorn:die()
     }
 end
 
-function Acorn:collide(player, dt, mtv_x, mtv_y)
-    if player.rebounding then
-        return
-    end
-
-    local a = player.position.x < self.position.x and -1 or 1
-    local x1,y1,x2,y2 = self.bb:bbox()
-
-    if player.position.y + player.height <= (y2-5) and player.velocity.y > 0 and self.state ~= 'fury' then 
-        -- successful attack
-        self:die()
-        if cheat.jump_high then
-            player.velocity.y = -570
-        else
-            player.velocity.y = -350
+function Acorn:collide(node, dt, mtv_x, mtv_y)
+    if node.isPlayer then
+        local player = node
+        if player.rebounding then
+            return
         end
-        return
-    end
 
-    if cheat.god then
-        self:die()
-        return
-    end
-    
-    if player.invulnerable then
-        return
-    end
-    
-    self:hit()
+        local a = player.position.x < self.position.x and -1 or 1
+        local x1,y1,x2,y2 = self.bb:bbox()
 
-    player:die(self.damage)
-    player.bb:move(mtv_x, mtv_y)
-    player.velocity.y = -450
-    player.velocity.x = 300 * a
+        if player.position.y + player.height <= (y2-5) and player.velocity.y > 0 and self.state ~= 'fury' then 
+            -- successful attack
+            self:die()
+            if cheat.jump_high then
+                player.velocity.y = -570
+            else
+                player.velocity.y = -350
+            end
+            return
+        end
+
+        if cheat.god then
+            self:die()
+            return
+        end
+    
+        if player.invulnerable then
+            return
+        end
+    
+        self:hit()
+
+        player:die(self.damage)
+        player.bb:move(mtv_x, mtv_y)
+        player.velocity.y = -450
+        player.velocity.x = 300 * a
+    end
 end
 
 
@@ -138,12 +139,7 @@ function Acorn:update(dt, player)
     self:animation():update(dt)
 
     if self.state == 'dying' or self.state == 'dyingfury' then
-        if controls.isDown( 'UP' ) then
-            local item = acornItem.new()
-        if player.inventory:addItem(item) then
-            self.exists = false
-        end
-    end
+        return
     end
 
     if self.state == 'fury' then
@@ -181,7 +177,9 @@ function Acorn:update(dt, player)
 end
 
 function Acorn:draw()
-    self:animation():draw( sprite, math.floor( self.position.x ), math.floor( self.position.y ) )
+    if not self.dead then
+        self:animation():draw( sprite, math.floor( self.position.x ), math.floor( self.position.y ) )
+    end
 
     for _,c in pairs(self.coins) do
         c:draw()
