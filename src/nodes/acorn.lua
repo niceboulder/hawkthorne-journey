@@ -72,10 +72,12 @@ function Acorn:hit()
 end
 
 function Acorn:die()
-    sound.playSfx( "hippie_kill" ) -- needs acorn death sound
+    sound.playSfx( "acorn_kill" )
     if self.state == 'fury' then
+        sound.playSfx("acorn_growl")
         self.state = 'dyingfury'
     else
+        sound.playSfx("acorn_squeak")
         self.state = 'dying'
     end
     self.collider:setGhost(self.bb)
