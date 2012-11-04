@@ -22,6 +22,7 @@
 -- 'fade' ( true / false ) - Fades the object from 1 at the top to 'opacity' at the bottom. ( defaults to false )
 
 local anim8 = require 'vendor/anim8'
+local cheat = require 'cheat'
 local Helper = require 'helper'
 local window = require 'window'
 
@@ -75,7 +76,10 @@ function Liquid.new(node, collider)
     return liquid
 end
 
-function Liquid:collide(player, dt, mtv_x, mtv_y)
+function Liquid:collide(node, dt, mtv_x, mtv_y)
+    if not node.isPlayer then return end
+    local player = node
+    
     -- mask the player outside the liquid
     if self.mask then player.stencil = self.stencil end
     
@@ -105,13 +109,21 @@ function Liquid:collide(player, dt, mtv_x, mtv_y)
         end
 
         if player.velocity.y > 0 then
+            player:restore_solid_ground()
             player.jumping = false
-            player.velocity.y = 20
+            if cheat.jump_high then
+                player.velocity.y = 30
+            else
+                player.velocity.y = 20
+            end
         end
     end
 end
 
-function Liquid:collide_end(player, dt, mtv_x, mtv_y)
+function Liquid:collide_end(node, dt, mtv_x, mtv_y)
+    if not node.isPlayer then return end
+    local player = node
+    
     -- unmask
     if self.mask then player.stencil = nil end
     
@@ -157,10 +169,6 @@ function Liquid:draw()
         end
     end
     love.graphics.setColor( 255, 255, 255, 255 )
-end
-
-function map( x, in_min, in_max, out_min, out_max)
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 end
 
 return Liquid

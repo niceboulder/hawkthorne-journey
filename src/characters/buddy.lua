@@ -14,6 +14,9 @@ local beam = love.graphics.newImage('images/characters/' .. plyr.name .. '/beam.
 
 function plyr.new(sheet)
     local new_plyr = {}
+    new_plyr.name = plyr.name
+    new_plyr.offset = plyr.offset
+    new_plyr.ow = plyr.ow
     new_plyr.sheet = sheet
     new_plyr.sheet:setFilter('nearest', 'nearest')
     new_plyr.positions = position_matrix_main
@@ -58,6 +61,30 @@ function plyr.new(sheet)
             left = anim8.newAnimation('loop', g('2-4,7'), 0.16),
             right = anim8.newAnimation('loop', g('2-4,6'), 0.16),
         },
+        attackjump = {
+            left = anim8.newAnimation('loop', g('2-4,11'), 0.16),
+            right = anim8.newAnimation('loop', g('2-4,10'), 0.16),
+        },
+        attackwalk = {
+            left = anim8.newAnimation('loop', g('2-4,9'), 0.16),
+            right = anim8.newAnimation('loop', g('2-4,8'), 0.16),
+        },
+        wieldwalk = { --state for walking while holding a weapon
+            left = anim8.newAnimation('loop', g('2,9','3,9'), 0.16),
+            right = anim8.newAnimation('loop', g('2,8','3,8'), 0.16),
+        },
+        wieldidle = { --state for standing while holding a weapon
+            left = anim8.newAnimation('once', g(1,7), 1),
+            right = anim8.newAnimation('once', g(1,6), 1),
+        },
+        wieldjump = { --state for jumping while holding a weapon
+            left = anim8.newAnimation('once', g('1,11'), 1),
+            right = anim8.newAnimation('once', g('1,10'), 1),
+        },
+        wieldaction = { --state for swinging a weapon
+            left = anim8.newAnimation('once', g('1-4,7'), 0.09),
+            right = anim8.newAnimation('once', g('1-4,6'), 0.09),
+        },
         jump = {
             right = anim8.newAnimation('once', g('9,2'), 1),
             left = anim8.newAnimation('once', g('9,1'), 1)
@@ -70,6 +97,7 @@ function plyr.new(sheet)
             right = anim8.newAnimation('once', g(1,2), 1),
             left = anim8.newAnimation('once', g(1,1), 1),
         },
+        flyin = anim8.newAnimation('once', g('8,17'), 1),
         warp = anim8.newAnimation('once', warp('1-4,1'), 0.08),
     }
     return new_plyr

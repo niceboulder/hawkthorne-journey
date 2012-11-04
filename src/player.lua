@@ -5,6 +5,8 @@ local window = require 'window'
 local cheat = require 'cheat'
 local sound = require 'vendor/TEsound'
 local game = require 'game'
+local controls = require 'controls'
+local KeyboardContext = require 'keyboard_context'
 
 local healthbar = love.graphics.newImage('images/health.png')
 healthbar:setFilter('nearest', 'nearest')
@@ -22,7 +24,9 @@ local health = love.graphics.newImage('images/damage.png')
 
 local Player = {}
 Player.__index = Player
+Player.isPlayer = true
 
+local player = nil
 ---
 -- Create a new Player
 -- @param collider
@@ -31,6 +35,7 @@ function Player.new(collider)
     local plyr = {}
 
     setmetatable(plyr, Player)
+    plyr.kc = KeyboardContext.new("player", true)
     plyr.jumpQueue = Queue.new()
     plyr.halfjumpQueue = Queue.new()
     plyr.rebounding = false
@@ -72,16 +77,98 @@ function Player.new(collider)
     --for damage text
     plyr.healthText = {x=0, y=0}
     plyr.healthVel = {x=0, y=0}
-    plyr.health = 6
+    plyr.max_health = 6
+    plyr.health = plyr.max_health
     plyr.damageTaken = 0
 
     plyr.inventory = Inventory.new()
     plyr.prevAttackPressed = false
     
     plyr.money = 0
+    plyr.lives = 3
 
     return plyr
 end
+
+function Player:refreshPlayer(collider)
+
+    self.kc:set()
+    self.jumpQueue = Queue.new()
+    self.halfjumpQueue = Queue.new()
+    self.rebounding = false
+    --self.invulnerable = false
+    self.jumping = false
+    self.liquid_drag = false
+    self.flash = false
+    self.width = 48
+    self.height = 48
+    self.bbox_width = 18
+    self.bbox_height = 44
+    --self.sheet = nil 
+    self.actions = {}
+
+    --if self.position == nil then
+    --    self.position = {x=0, y=0}
+    --end
+
+    self.velocity = {x=0, y=0}
+    self.fall_damage = 0
+    self.since_solid_ground = 0
+    self.state = 'idle'       -- default animation is idle
+    self.direction = 'right'  -- default animation faces right
+    --self.animations = {}
+    self.warpin = false
+    self.dead = false
+    self.crouch_state = 'crouch'
+    self.gaze_state = 'gaze'
+    self.walk_state = 'walk'
+    self.hand_offset = 10
+    self.freeze = false
+    self.mask = nil
+    self.stopped = false
+
+    self.grabbing       = false -- Whether 'grab' key is being pressed
+    self.currently_held = nil -- Object currently being held by the player
+    self.holdable       = nil -- Object that would be picked up if player used grab key
+
+    self.collider = collider
+    self.bb = collider:addRectangle(0,0,self.bbox_width,self.bbox_height)
+    self:moveBoundingBox()
+    self.bb.player = self -- wat
+
+    --for damage text
+    --self.healthText = {x=0, y=0}
+    --self.healthVel = {x=0, y=0}
+    --self.health = 6
+    --self.damageTaken = 0
+
+    --self.inventory = Inventory.new()
+    self.prevAttackPressed = false
+
+    --self.money = 0
+
+end
+---
+-- Create or look up a new Player
+-- @param collider
+-- @param playerNum the index of the player
+-- @return Player
+function Player.factory(collider)
+    local plyr = player
+    if plyr~=nil then
+        plyr = player
+        if plyr.state=='dead' then
+            plyr = Player.new(collider)
+            player = plyr
+        end
+        return plyr
+    else
+        plyr = Player.new(collider)
+        player = plyr
+        return plyr
+    end
+end
+
 
 ---
 -- Loads a character sheet
@@ -142,33 +229,60 @@ function Player:moveBoundingBox()
     Helper.moveBoundingBox(self)
 end
 
+function Player:keypressed( button, map )
+    if not self.kc:active() then return end
+    
+    if button == 'SELECT' then
+        self.inventory:open( self )
+    end
+    
+    if button == 'A' and not self.holdable and not self.currently_held then
+        self:attack()
+    end
+    
+    -- taken from sonic physics http://info.sonicretro.org/SPG:Jumping
+    if button == 'B' and map.jumping then
+        self.jumpQueue:push('jump')
+    end
+end
+
+function Player:keyreleased( button, map )
+    -- taken from sonic physics http://info.sonicretro.org/SPG:Jumping
+    if button == 'B' and map.jumping then
+        self.halfjumpQueue:push('jump')
+    end
+end
+
 ---
 -- This is the main update loop for the player, handling position updates.
 -- @param dt The time delta
 -- @return nil
-function Player:update(dt)
+function Player:update( dt )
+    if self.inventory.visible then
+        self.inventory:update( dt )
+        return
+    end
+    
     if self.freeze then
         return
     end
 
-    local crouching = love.keyboard.isDown('down') or love.keyboard.isDown('s')
-    local gazing = love.keyboard.isDown('up') or love.keyboard.isDown('w')
-    local movingLeft = love.keyboard.isDown('left') or love.keyboard.isDown('a')
-    local movingRight = love.keyboard.isDown('right') or love.keyboard.isDown('d')
-    local grabbing = love.keyboard.isDown('lshift') or love.keyboard.isDown('rshift')
-
-    if self.inventory.visible then
-        crouching = false
-        gazing = false
-        movingLeft = false
-        movingRight = false
-    end
+    local crouching = controls.isDown( 'DOWN' )
+    local gazing = controls.isDown( 'UP' )
+    local movingLeft = controls.isDown( 'LEFT' )
+    local movingRight = controls.isDown( 'RIGHT' )
+    local grabbing = controls.isDown( 'A' )
+    local jumping = controls.isDown( 'B' )
 
     if not self.invulnerable then
         self:stopBlink()
     end
 
     if self.health <= 0 then
+        self.velocity.y = self.velocity.y + game.gravity * dt
+        if self.velocity.y > game.max_y then self.velocity.y = game.max_y end
+        self.position.y = self.position.y + self.velocity.y * dt
+        self:moveBoundingBox()
         return
     end
 
@@ -242,7 +356,7 @@ function Player:update(dt)
     local jumped = self.jumpQueue:flush()
     local halfjumped = self.halfjumpQueue:flush()
 
-    if jumped and not self.jumping and self.velocity.y == 0
+    if jumped and not self.jumping and self:solid_ground()
         and not self.rebounding and not self.liquid_drag then
         self.jumping = true
         if cheat.jump_high then
@@ -251,7 +365,7 @@ function Player:update(dt)
             self.velocity.y = -670
         end
         sound.playSfx( "jump" )
-    elseif jumped and not self.jumping and self.velocity.y > -1
+    elseif jumped and not self.jumping and self:solid_ground()
         and not self.rebounding and self.liquid_drag then
      -- Jumping through heavy liquid:
         self.jumping = true
@@ -264,6 +378,7 @@ function Player:update(dt)
     end
 
     self.velocity.y = self.velocity.y + game.gravity * dt
+    self.since_solid_ground = self.since_solid_ground + dt
 
     if self.velocity.y > game.max_y then
         self.velocity.y = game.max_y
@@ -333,18 +448,6 @@ function Player:update(dt)
     end
 
     self.healthText.y = self.healthText.y + self.healthVel.y * dt
-
-    self.inventory:update(dt)
-
-    if self.inventory.visible then return end
-    if (love.keyboard.isDown('rctrl') or love.keyboard.isDown('lctrl') or love.keyboard.isDown('f')) then 
-        if (not self.prevAttackPressed) then 
-            self.prevAttackPressed = true
-            self:attack()
-        end
-    else
-        self.prevAttackPressed = false
-    end
     
     sound.adjustProximityVolumes()
 end
@@ -495,6 +598,24 @@ function Player:setSpriteStates(presetName)
         self.crouch_state = 'crouchwalk'
         self.gaze_state   = 'gazewalk'
     end
+end
+
+---
+-- Get whether the player has the ability to jump from here
+-- @return bool
+function Player:solid_ground()
+    if self.since_solid_ground < game.fall_grace then
+        return true
+    else
+        return false
+    end
+end
+
+---
+-- Function to call when colliding with the ground
+-- @return nil
+function Player:restore_solid_ground()
+    self.since_solid_ground = 0
 end
 
 ---

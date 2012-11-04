@@ -26,7 +26,6 @@ end
 
 function Wardrobe:newCharacter()
     local sprite = self.character.new(self.image)
-    sprite.ow = self.character.ow
     return sprite
 end
 
@@ -59,30 +58,40 @@ function Wardrobe:draw(x, y, flipX)
 end
 
 
-local main_selections = {}
-main_selections[0] = {}
-main_selections[1] = {}
-main_selections[1][0] = Wardrobe.create(require 'characters/troy')
-main_selections[1][1] = Wardrobe.create(require 'characters/shirley')
-main_selections[1][2] = Wardrobe.create(require 'characters/pierce')
-main_selections[0][0] = Wardrobe.create(require 'characters/jeff')
-main_selections[0][1] = Wardrobe.create(require 'characters/britta')
-main_selections[0][2] = Wardrobe.create(require 'characters/abed')
-main_selections[0][3] = Wardrobe.create(require 'characters/annie')
+local character_selections = {}
+character_selections[1] = {} -- main characters
+character_selections[1][0] = {} -- left
+character_selections[1][1] = {} -- right
+character_selections[1][1][0] = Wardrobe.create(require 'characters/troy')
+character_selections[1][1][1] = Wardrobe.create(require 'characters/shirley')
+character_selections[1][1][2] = Wardrobe.create(require 'characters/pierce')
+character_selections[1][0][0] = Wardrobe.create(require 'characters/jeff')
+character_selections[1][0][1] = Wardrobe.create(require 'characters/britta')
+character_selections[1][0][2] = Wardrobe.create(require 'characters/abed')
+character_selections[1][0][3] = Wardrobe.create(require 'characters/annie')
 
-local alt_selections = {}
-alt_selections[0] = {}
-alt_selections[1] = {}
-alt_selections[1][0] = Wardrobe.create(require 'characters/fatneil')
-alt_selections[1][1] = Wardrobe.create(require 'characters/chang')
-alt_selections[1][2] = Wardrobe.create(require 'characters/vicedean')
-alt_selections[0][0] = Wardrobe.create(require 'characters/guzman')
-alt_selections[0][1] = Wardrobe.create(require 'characters/buddy')
-alt_selections[0][2] = Wardrobe.create(require 'characters/leonard')
-alt_selections[0][3] = Wardrobe.create(require 'characters/dean')
+character_selections[2] = {} -- page 2
+character_selections[2][0] = {} -- left
+character_selections[2][1] = {} -- right
+character_selections[2][1][0] = Wardrobe.create(require 'characters/chang')
+character_selections[2][1][1] = Wardrobe.create(require 'characters/fatneil')
+character_selections[2][1][2] = Wardrobe.create(require 'characters/vicedean')
+character_selections[2][0][0] = Wardrobe.create(require 'characters/dean')
+character_selections[2][0][1] = Wardrobe.create(require 'characters/guzman')
+character_selections[2][0][2] = Wardrobe.create(require 'characters/buddy')
+character_selections[2][0][3] = Wardrobe.create(require 'characters/leonard')
 
-local main_selected = true
-local selections = main_selections
+character_selections[3] = {} -- page 3
+character_selections[3][0] = {} -- left
+character_selections[3][1] = {} -- right
+character_selections[3][1][0] = Wardrobe.create(require 'characters/ian')
+character_selections[3][1][1] = Wardrobe.create(require 'characters/rich')
+character_selections[3][1][2] = Wardrobe.create(require 'characters/vicki')
+character_selections[3][0][0] = Wardrobe.create(require 'characters/vaughn')
+
+
+local current_page = 1
+local selections = character_selections[current_page]
 
 function state:init()
     self.side = 0 -- 0 for left, 1 for right
@@ -91,7 +100,7 @@ function state:init()
     self.arrow = love.graphics.newImage("images/arrow.png")
     self.tmp = love.graphics.newImage('images/characters/jeff/base.png')
 
-    background.load()
+    background.init()
 end
 
 function state:enter(previous)
@@ -106,7 +115,7 @@ function state:wardrobe()
     return selections[self.side][self.level]
 end
 
-function state:keypressed(key)
+function state:keypressed( button )
     -- If any input is received while sliding, speed up
     if background.slideIn or background.slideOut then
         background.speed = 10
@@ -116,26 +125,25 @@ function state:keypressed(key)
     local level = self.level
     local options = 4
 
-    if key == 'left' or key == 'right' or key == 'a' or key == 'd' then
+    if button == 'LEFT' or button == 'RIGHT' then
         self.side = (self.side - 1) % 2
-    elseif key == 'up' or key == 'w' then
+    elseif button == 'UP' then
         level = (self.level - 1) % options
-    elseif key == 'down' or key == 's' then
+    elseif button == 'DOWN' then
         level = (self.level + 1) % options
     end
 
-    if key == 'tab' then
+    if button == 'A' or button == 'B' then
         if self.level == 3 and self.side == 1 then
             return
-        elseif love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift") then
-            local wardrobe = self:wardrobe()
-            if wardrobe then
-                wardrobe:prevCostume()
-            end
         else
             local wardrobe = self:wardrobe()
             if wardrobe then
-                wardrobe:nextCostume()
+                if button == 'A' then
+                    wardrobe:nextCostume()
+                else
+                    wardrobe:prevCostume()
+                end
             end
         end
         return
@@ -143,20 +151,15 @@ function state:keypressed(key)
 
     self.level = level
 
-    if key == 'escape' then
-        Gamestate.switch('home')
+    if button == 'START' then
+        Gamestate.switch('menu')
         return
     end
     
-    if ( key == 'return' or key == 'kpenter' ) and self.level == 3 and self.side == 1 then
-        if main_selected then
-            selections = alt_selections
-            main_selected = false
-        else
-            selections = main_selections
-            main_selected = true
-        end
-    elseif key == 'return' or key == 'kpenter' then
+    if ( button == 'SELECT' ) and self.level == 3 and self.side == 1 then
+        current_page = current_page % #character_selections + 1
+        selections = character_selections[current_page]
+    elseif button == 'SELECT' then
         if self:wardrobe() then
             -- Tell the background to transition out before changing scenes
             background.slideOut = true
@@ -176,7 +179,7 @@ function state:update(dt)
         love.graphics.setColor(255, 255, 255, 255)
         local level = Gamestate.get('overworld')
         level:reset()
-        Gamestate.switch('overworld', self:wardrobe():newCharacter())
+        Gamestate.switch('flyin', self:wardrobe():newCharacter())
     end
 end
 
@@ -202,9 +205,9 @@ function state:draw()
             name = costume.name
         end
 
-        love.graphics.printf("Enter to start", 0,
+        love.graphics.printf("START to choose", 0,
             window.height - 55, window.width, 'center')
-        love.graphics.printf("Tab to switch costume", 0,
+        love.graphics.printf("A / B to change costume", 0,
             window.height - 35, window.width, 'center')
 
         love.graphics.printf(name, 0,
@@ -214,6 +217,7 @@ function state:draw()
         love.graphics.setColor(255, 255, 255, 200)
         love.graphics.print("INSUFFICIENT", x, y + 5, 0, 0.5, 0.5, 12, -6)
         love.graphics.print(  "FRIENDS"   , x, y + 5, 0, 0.5, 0.5, -12, -32)
+        love.graphics.print( current_page .. ' / ' .. #character_selections, x + 60, y + 15, 0, 0.5, 0.5 )
         love.graphics.setColor(255, 255, 255, 255)
     end
 

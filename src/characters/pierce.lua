@@ -31,6 +31,9 @@ local beam = love.graphics.newImage('images/characters/' .. plyr.name .. '/beam.
 
 function plyr.new(sheet)
     local new_plyr = {}
+    new_plyr.name = plyr.name
+    new_plyr.offset = plyr.offset
+    new_plyr.ow = plyr.ow
     new_plyr.sheet = sheet
     new_plyr.sheet:setFilter('nearest', 'nearest')
     new_plyr.positions = position_matrix_main
@@ -52,8 +55,8 @@ function plyr.new(sheet)
             left = anim8.newAnimation('once', g('7,1'), 1)
         },
         hold = {
-            right = anim8.newAnimation('once', g(7,12), 1),
-            left = anim8.newAnimation('once', g(7,11), 1),
+            right = anim8.newAnimation('once', g('7,12'), 1),
+            left = anim8.newAnimation('once', g('7,11'), 1),
         },
         holdwalk = { 
             right = anim8.newAnimation('loop', g('1-4,14'), 0.16),
@@ -64,25 +67,54 @@ function plyr.new(sheet)
             left = anim8.newAnimation('loop', g('2-5,1'), 0.16)
         },
         idle = {
-            right = anim8.newAnimation('once', g(1,2), 1),
-            left = anim8.newAnimation('once', g(1,1), 1)
+            right = anim8.newAnimation('once', g('1,2'), 1),
+            left = anim8.newAnimation('once', g('1,1'), 1)
         },
         crouch = {
-            right = anim8.newAnimation('once', g(3,6), 1),
-            left = anim8.newAnimation('once', g(3,5), 1)
+            right = anim8.newAnimation('once', g('3,6'), 1),
+            left = anim8.newAnimation('once', g('3,5'), 1)
         },
         crouchwalk = { --state for walking towards the camera
             right = anim8.newAnimation('loop', g('2-3,3'), 0.16),
             left = anim8.newAnimation('loop', g('2-3,3'), 0.16)
         },
+        attack = {
+            left = anim8.newAnimation('loop', g('6,5', '8,5'), 0.16),
+            right = anim8.newAnimation('loop', g('6,6', '8,6'), 0.16),
+        },
+        attackjump = {
+            left = anim8.newAnimation('loop', g('7,3','9,3'), 0.16),
+            right = anim8.newAnimation('loop', g('7,4','9,4'), 0.16),
+        },
+        attackwalk = {
+            left = anim8.newAnimation('loop', g('5,3','6,3','9,3','6,3'), 0.16),
+            right = anim8.newAnimation('loop', g('5,4','6,4','9,4','6,4'), 0.16),
+        },
+        wieldwalk = { --state for walking while holding a weapon
+            left = anim8.newAnimation('loop', g('5-6,3'), 0.16),
+            right = anim8.newAnimation('loop', g('5-6,4'), 0.16),
+        },
+        wieldidle = { --state for standing while holding a weapon
+            left = anim8.newAnimation('once', g(1,5), 1),
+            right = anim8.newAnimation('once', g(1,6), 1),
+        },
+        wieldjump = { --state for jumping while holding a weapon
+            left = anim8.newAnimation('once', g('5,3'), 1),
+            right = anim8.newAnimation('once', g('5,4'), 1),
+        },
+        wieldaction = { --state for swinging a weapon
+            left = anim8.newAnimation('once', g('5,4','6,4','9,4','6,4'), 0.09),
+            right = anim8.newAnimation('once', g('5,5','6,5','9,5','6,5'), 0.09),
+        },
         gaze = {
-            right = anim8.newAnimation('once', g(8,2), 1),
-            left = anim8.newAnimation('once', g(8,1), 1)
+            right = anim8.newAnimation('once', g('8,2'), 1),
+            left = anim8.newAnimation('once', g('8,1'), 1)
         },
         gazewalk = { --state for walking away from the camera
             right = anim8.newAnimation('loop', g('2-3,4'), 0.16),
             left = anim8.newAnimation('loop', g('2-3,4'), 0.16)
         },
+        flyin = anim8.newAnimation('once', g('4,3'), 1),
         warp = anim8.newAnimation('once', warp('1-4,1'), 0.08)
     }
     return new_plyr

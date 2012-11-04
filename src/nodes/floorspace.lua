@@ -1,4 +1,6 @@
 local Block = require 'nodes/block'
+local controls = require 'controls'
+
 local Floorspace = {}
 Floorspace.__index = Floorspace
 
@@ -38,8 +40,8 @@ function Floorspace:update(dt, player)
 
     local _, wy1, _, _  = self.bb:bbox()
 
-    local moveDown = (love.keyboard.isDown('down') or love.keyboard.isDown('s'))
-    local moveUp = (love.keyboard.isDown('up') or love.keyboard.isDown('w'))
+    local moveDown = controls.isDown( 'DOWN' )
+    local moveUp = controls.isDown( 'UP' )
 
     if player.inventory.visible then
         moveDown = false
@@ -63,7 +65,10 @@ function Floorspace:update(dt, player)
     end
 end
 
-function Floorspace:collide(player, dt, mtv_x, mtv_y)
+function Floorspace:collide(node, dt, mtv_x, mtv_y)
+    if not node.isPlayer then return end
+    local player = node
+    
     local _, wy1, _, wy2  = self.bb:bbox()
     local _, py1, _, py2 = player.bb:bbox()
 
@@ -72,6 +77,7 @@ function Floorspace:collide(player, dt, mtv_x, mtv_y)
         player.position.y = wy1 - player.height + 2 -- fudge factor
         player:moveBoundingBox()
 
+        player:restore_solid_ground()
         player.jumping = false
         player.rebounding = false
     end
