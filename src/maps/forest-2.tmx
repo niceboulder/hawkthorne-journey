@@ -9,7 +9,7 @@
   <property name="title" value="Forest 2"/>
  </properties>
  <tileset firstgid="1" name="forest" tilewidth="24" tileheight="24">
-  <image source="../images/tilesets/forest.png" width="216" height="192"/>
+  <image source="../images/tilesets/forest.png" width="216" height="240"/>
  </tileset>
  <layer name="clouds 2" width="80" height="24" opacity="0.98">
   <properties>
@@ -234,7 +234,7 @@
   <object x="61" y="288" width="35" height="22"/>
   <object x="888" y="384" width="35" height="22"/>
  </objectgroup>
- <objectgroup color="#3999a4" name="floor" width="80" height="24">
+ <objectgroup color="#3999a4" name="wall" width="80" height="24">
   <object x="0" y="456" width="240" height="120"/>
   <object x="624" y="456" width="504" height="120"/>
   <object x="1176" y="456" width="96" height="120"/>
