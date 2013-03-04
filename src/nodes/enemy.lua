@@ -16,6 +16,7 @@ local cheat = require 'cheat'
 local sound = require 'vendor/TEsound'
 local token = require 'nodes/token'
 local game = require 'game'
+local weapon = require 'nodes/weapon'
 
 local Enemy = {}
 Enemy.__index = Enemy
@@ -110,7 +111,7 @@ function Enemy:animation()
     return self.animations[self.state][self.direction]
 end
 
-function Enemy:hurt( damage )
+function Enemy:hurt( damage, player )
     if self.props.die_sound then sound.playSfx( self.props.die_sound ) end
     if not damage then damage = 1 end
     self.state = 'dying'
@@ -123,6 +124,7 @@ function Enemy:hurt( damage )
         end)
         if self.reviveTimer then Timer.cancel( self.reviveTimer ) end
         self:dropTokens()
+        self:drop( 'weapon', 'sword', player )
         if self.currently_held then
             self.currently_held:die()
         end
@@ -138,6 +140,24 @@ function Enemy:die()
     self.collider:remove(self.bb)
     self.bb = nil
     --todo:remove from level.nodes
+end
+
+function Enemy:drop( type, name, player )    
+    local item = require ('nodes/'.. type)
+    local node = self
+    node.name = name
+    node.position.y = self.position.y + 24
+    local level = gamestate.currentState()
+    
+    table.insert(
+        level.nodes,
+        item.new(
+            node,
+            self.collider,
+            player,
+            0
+            )
+        )
 end
 
 function Enemy:dropTokens()
@@ -185,7 +205,7 @@ function Enemy:collide(node, dt, mtv_x, mtv_y)
     if playerBottom >= enemyTop and (playerBottom - enemyTop) < headsize
         and player.velocity.y > self.velocity.y and self.jumpkill then
         -- successful attack
-        self:hurt(player.jumpDamage)
+        self:hurt(player.jumpDamage, player)
         player.velocity.y = -450 * player.jumpFactor
     end
 

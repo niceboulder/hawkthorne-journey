@@ -1,5 +1,6 @@
 local Timer = require 'vendor/timer'
 local sound = require 'vendor/TEsound'
+local item = require 'nodes/weapons/sword'
 
 return {
     name = 'acorn',
