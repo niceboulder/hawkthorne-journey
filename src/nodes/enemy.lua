@@ -118,13 +118,13 @@ function Enemy:hurt( damage, player )
     self.hp = self.hp - damage
     if self.hp <= 0 then
         if self.props.splat then self.props.splat( self )end
+        self:drop( 'weapon', 'sword', player )
         self.collider:setGhost(self.bb)
         Timer.add(self.dyingdelay, function() 
             self:die()
         end)
         if self.reviveTimer then Timer.cancel( self.reviveTimer ) end
         self:dropTokens()
-        self:drop( 'weapon', 'sword', player )
         if self.currently_held then
             self.currently_held:die()
         end
@@ -144,20 +144,14 @@ end
 
 function Enemy:drop( type, name, player )    
     local item = require ('nodes/'.. type)
-    local node = self
+    local node = self.node
     node.name = name
-    node.position.y = self.position.y + 24
+    local obj = item.new(node, self.collider, nil, 0)
+    obj.position.y = self.position.y - self.height
+    obj.position.x = self.position.x
     local level = gamestate.currentState()
     
-    table.insert(
-        level.nodes,
-        item.new(
-            node,
-            self.collider,
-            player,
-            0
-            )
-        )
+    table.insert( level.nodes, obj )
 end
 
 function Enemy:dropTokens()
