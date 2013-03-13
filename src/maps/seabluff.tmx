@@ -214,7 +214,7 @@
   </object>
   <object type="sprite" x="312" y="408" width="577" height="48">
    <properties>
-    <property name="foreground" value="true"/>
+    <property name="" value=""/>
     <property name="sheet" value="images/seabluffbridge.png"/>
    </properties>
   </object>
