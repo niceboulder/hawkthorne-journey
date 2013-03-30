@@ -9,13 +9,13 @@
 --    animation frames, movement function and additional properties.
 ------------------------------
 
+local gamestate = require 'vendor/gamestate'
 local anim8 = require 'vendor/anim8'
 local Timer = require 'vendor/timer'
 local cheat = require 'cheat'
 local sound = require 'vendor/TEsound'
 local token = require 'nodes/token'
 local game = require 'game'
-local ach = (require 'achievements').new()
 
 local Enemy = {}
 Enemy.__index = Enemy
@@ -34,8 +34,13 @@ function Enemy.new(node, collider, enemytype)
     enemy.type = type
     
     enemy.props = require( 'nodes/enemies/' .. type )
-    
-    enemy.sprite = love.graphics.newImage( 'images/enemies/' .. type .. '.png' )
+    local sprite_sheet
+    if node.properties.sheet then
+        sprite_sheet = 'images/enemies/' .. node.properties.sheet .. '.png'
+    else
+        sprite_sheet = 'images/enemies/' .. type .. '.png'
+    end
+    enemy.sprite = love.graphics.newImage( sprite_sheet )
     enemy.sprite:setFilter('nearest', 'nearest')
     
     enemy.grid = anim8.newGrid( enemy.props.width, enemy.props.height, enemy.sprite:getWidth(), enemy.sprite:getHeight() )
@@ -50,7 +55,8 @@ function Enemy.new(node, collider, enemytype)
     assert( enemy.props.damage, "You must provide a 'damage' value for " .. type )
 
     assert( enemy.props.hp, "You must provide a 'hp' ( hit point ) value for " .. type )
-    enemy.hp = enemy.props.hp
+    assert(tonumber(enemy.props.hp),"Hp must be a number")
+    enemy.hp = tonumber(enemy.props.hp)
     
     enemy.position_offset = enemy.props.position_offset or {x=0,y=0}
     
@@ -62,8 +68,8 @@ function Enemy.new(node, collider, enemytype)
     enemy.width = enemy.props.width
     --enemy.velocity = enemy.props.velocity or {x=0,y=0}
     enemy.velocity = {
-        x = node.velocity and node.velocity.x or 0,
-        y = node.velocity and node.velocity.y or 0
+        x = node.velocityX or (node.velocity and node.velocity.x) or 0,
+        y = node.velocityY or (node.velocity and node.velocity.y) or 0
     }
     
     enemy.last_jump = 0
@@ -75,7 +81,7 @@ function Enemy.new(node, collider, enemytype)
     enemy.revivedelay = enemy.props.revivedelay and enemy.props.revivedelay or .5
     
     enemy.state = 'default'
-    enemy.direction = 'left'
+    enemy.direction = node.properties.direction or 'left'
     enemy.offset_hand_right = {}
     enemy.offset_hand_right[1] = enemy.props.hand_x or enemy.width/2
     enemy.offset_hand_right[2] = enemy.props.hand_y or enemy.height/2
@@ -90,12 +96,17 @@ function Enemy.new(node, collider, enemytype)
         end
     end
     
-    enemy.bb = collider:addRectangle( node.x, node.y, enemy.props.bb_width or enemy.props.width, enemy.props.bb_height or enemy.props.height )
+    enemy.bb = collider:addRectangle(node.x, node.y, 
+                                     enemy.props.bb_width or enemy.props.width,
+                                     enemy.props.bb_height or enemy.props.height)
     enemy.bb.node = enemy
-
     enemy.bb_offset = enemy.props.bb_offset or {x=0,y=0}
+
+    if enemy.props.passive then
+      collider:setGhost(enemy.bb)
+    end
     
-    enemy.tokens = {} --the tokens the enemy drops when killed
+    enemy.foreground = node.properties.foreground or enemy.props.foreground or false
     
     return enemy
 end
@@ -112,21 +123,22 @@ end
 
 function Enemy:hurt( damage )
     if self.props.die_sound then sound.playSfx( self.props.die_sound ) end
+
     if not damage then damage = 1 end
     self.state = 'dying'
     self.hp = self.hp - damage
     if self.hp <= 0 then
         if self.props.splat then self.props.splat( self )end
         self.collider:setGhost(self.bb)
+        
+        if self.currently_held then
+            self.currently_held:die()
+        end
         Timer.add(self.dyingdelay, function() 
             self:die()
         end)
         if self.reviveTimer then Timer.cancel( self.reviveTimer ) end
-        ach:achieve( self.type .. ' killed by player' )
         self:dropTokens()
-        if self.currently_held then
-            self.currently_held:die()
-        end
     else
         self.reviveTimer = Timer.add( self.revivedelay, function() self.state = 'default' end )
         if self.props.hurt then self.props.hurt( self ) end
@@ -138,7 +150,9 @@ function Enemy:die()
     self.dead = true
     self.collider:remove(self.bb)
     self.bb = nil
-    --todo:remove from level.nodes
+    if self.containerLevel then
+      self.containerLevel:removeNode(self)
+    end
 end
 
 function Enemy:dropTokens()
@@ -148,16 +162,20 @@ function Enemy:dropTokens()
         local r = math.random(100) / 100
         for _,d in pairs( self.props.tokenTypes ) do
             if r < d.p then
-                table.insert(
-                    self.tokens,
-                    token.new(
-                        d.item,
-                        self.position.x + self.props.width / 2,
-                        self.position.y + self.props.height,
-                        self.collider,
-                        d.v
-                    )
-                )
+                local node = {
+                    type = "token",
+                    name = d.item,
+                    x = self.position.x + self.props.width / 2,
+                    y = self.position.y + self.props.height,
+                    width = 24,
+                    height = 24,
+                    properties = {
+                        life = 5,
+                        value = d.v
+                    }
+                }
+                local token = token.new(node,self.collider)
+                self.containerLevel:addNode(token)
                 break
             end
         end
@@ -165,8 +183,8 @@ function Enemy:dropTokens()
 end
 
 function Enemy:collide(node, dt, mtv_x, mtv_y)
+	if not node.isPlayer or self.props.peaceful then return end
 
-	if not node.isPlayer then return end
     local player = node
     if player.rebounding or player.dead then
         player.current_enemy = nil
@@ -177,25 +195,22 @@ function Enemy:collide(node, dt, mtv_x, mtv_y)
          player.current_enemy = self
      end
     
-    if player.current_enemy ~= self then return end
+    if player.current_enemy ~= self then 
+        player.velocity.x = -player.velocity.x/100
+    return end
     
-    local _, _, _, playerBottom = player.bb:bbox()
+    local _, _, _, playerBottom = player.bottom_bb:bbox()
     local _, enemyTop, _, y2 = self.bb:bbox()
-    local headsize = (y2 - enemyTop) / 2
+    local headsize = 3*(y2 - enemyTop) / 4
 
     if playerBottom >= enemyTop and (playerBottom - enemyTop) < headsize
         and player.velocity.y > self.velocity.y and self.jumpkill then
         -- successful attack
         self:hurt(player.jumpDamage)
-        if cheat.jump_high then
-            player.velocity.y = -670
-        else
-            player.velocity.y = -450
-        end
-        return
+        player.velocity.y = -450 * player.jumpFactor
     end
 
-    if cheat.god then
+    if cheat:is('god') then
         self:hurt(self.hp)
         return
     end
@@ -218,10 +233,13 @@ function Enemy:collide(node, dt, mtv_x, mtv_y)
         )
     end
 
-    player:die(self.props.damage)
-    player.bb:move(mtv_x, mtv_y)
-    player.velocity.y = -450
-    player.velocity.x = 300 * ( player.position.x < self.position.x and -1 or 1 )
+    if self.props.damage ~= 0 then
+        player:die(self.props.damage)
+        player.top_bb:move(mtv_x, mtv_y)
+        player.bottom_bb:move(mtv_x, mtv_y)
+        player.velocity.y = -450
+        player.velocity.x = 300 * ( player.position.x < self.position.x and -1 or 1 )
+    end
 
 end
 
@@ -232,14 +250,12 @@ function Enemy:collide_end( node )
 end
 
 function Enemy:update( dt, player )
+    local level = gamestate.currentState()
+    if level.scene then return end
+    
     if(self.position.x < self.minimum_x or self.position.x > self.maximum_x or
        self.position.y < self.minimum_y or self.position.y > self.maximum_y) then
         self:die()
-    end
-       
-    
-    for _,c in pairs(self.tokens) do
-        c:update(dt)
     end
     
     if self.dead then
@@ -281,9 +297,6 @@ function Enemy:draw()
         self.props.draw(self)
     end
     
-    for _,c in pairs(self.tokens) do
-        c:draw()
-    end
 end
 
 function Enemy:ceiling_pushback(node, new_y)

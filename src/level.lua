@@ -1,3 +1,5 @@
+local app = require 'app'
+
 local Gamestate = require 'vendor/gamestate'
 local queue = require 'queue'
 local anim8 = require 'vendor/anim8'
@@ -17,13 +19,10 @@ local node_cache = {}
 local tile_cache = {}
 
 local Player = require 'player'
-local Floor = require 'nodes/floor'
 local Floorspace = require 'nodes/floorspace'
 local Floorspaces = require 'floorspaces'
 local Platform = require 'nodes/platform'
-local Wall = require 'nodes/wall'
-
-local ach = (require 'achievements').new()
+local Block = require 'nodes/block'
 
 local function limit( x, min, max )
     return math.min(math.max(x,min),max)
@@ -39,37 +38,30 @@ local function load_tileset(name)
     return tileset
 end
 
-local function load_node(name)
-    if node_cache[name] then
-        return node_cache[name]
-    end
-
-    local node = require('nodes/' .. name)
-    node_cache[name] = node
-    return node
-end
-
 local function on_collision(dt, shape_a, shape_b, mtv_x, mtv_y)
+    if shape_a.player and shape_b.player then return end
     local player, node, node_a, node_b
 
     if shape_a.player then
         player = shape_a.player
         node = shape_b.node
+        node.player_touched = true
+        if node.collide then
+            node:collide(player, dt, mtv_x, mtv_y, shape_a)
+        end
     elseif shape_b.player then
         player = shape_b.player
         node = shape_a.node
+        node.player_touched = true
+        if node.collide then
+            node:collide(player, dt, mtv_x, mtv_y, shape_b)
+        end
     else
         node_a = shape_a.node
         node_b = shape_b.node
     end
 
-    if node then
-        node.player_touched = true
-
-        if node.collide then
-            node:collide(player, dt, mtv_x, mtv_y)
-        end
-    elseif node_a then
+    if node_a then
         if node_a.collide then
             node_a:collide(node_b, dt, mtv_x, mtv_y)
         end
@@ -82,6 +74,7 @@ end
 
 -- this is called when two shapes stop colliding
 local function collision_stop(dt, shape_a, shape_b)
+    if shape_a.player and shape_b.player then return end
     local player, node
 
     if shape_a.player then
@@ -142,7 +135,7 @@ end
 
 local Level = {}
 Level.__index = Level
-Level.level = true
+Level.isLevel = true
 
 function Level.new(name)
     local level = {}
@@ -161,12 +154,13 @@ function Level.new(name)
     )
 
     level.map = require("maps/" .. name)
-    level.background = load_tileset(name)
+    level.tileset = load_tileset(name)
     level.collider = HC(100, on_collision, collision_stop)
     level.offset = getCameraOffset(level.map)
     level.music = getSoundtrack(level.map)
     level.spawn = (level.map.properties and level.map.properties.respawn) or 'studyroom'
     level.title = getTitle(level.map)
+    level.environment = {r=255, g=255, b=255, a=255}
  
     level:panInit()
 
@@ -178,30 +172,36 @@ function Level.new(name)
 
     level.transition = transition.new('fade', 0.5)
     level.events = queue.new()
+    level.trackPlayer = true
     level.nodes = {}
     level.doors = {}
 
     level.default_position = {x=0, y=0}
     for k,v in pairs(level.map.objectgroups.nodes.objects) do
-        node = load_node(v.type)
-        if node then
+        local NodeClass = require('nodes/' .. v.type)
+        local node
+
+        if NodeClass and v.type == 'scenetrigger' then
             v.objectlayer = 'nodes'
-            table.insert( level.nodes, node.new( v, level.collider ) )
+            local layer = level.map.objectgroups[v.properties.cutscene]
+            node = NodeClass( v, level.collider, layer, level )
+            node.drawHeight = v.height
+            level:addNode(node)
+        elseif NodeClass then
+            v.objectlayer = 'nodes'
+            node = NodeClass.new( v, level.collider, level)
+            node.drawHeight = v.height
+            level:addNode(node)
         end
-        if v.type == 'door' then
+
+        if v.type == 'door' or v.type == 'savepoint' then
             if v.name then
                 if v.name == 'main' then
                     level.default_position = {x=v.x, y=v.y}
                 end
-                level.doors[v.name] = {x=v.x, y=v.y, node=level.nodes[#level.nodes]}
+                
+                level.doors[v.name] = {x=v.x, y=v.y, node=node}
             end
-        end
-    end
-
-    if level.map.objectgroups.floor then
-        for k,v in pairs(level.map.objectgroups.floor.objects) do
-            v.objectlayer = 'floor'
-            Floor.new(v, level.collider)
         end
     end
 
@@ -209,29 +209,40 @@ function Level.new(name)
         level.floorspace = true
         for k,v in pairs(level.map.objectgroups.floorspace.objects) do
             v.objectlayer = 'floorspace'
-            table.insert(level.nodes, Floorspace.new(v, level))
+            local node = Floorspace.new(v, level)
+            level:addNode(node)
         end
     end
 
     if level.map.objectgroups.platform then
         for k,v in pairs(level.map.objectgroups.platform.objects) do
             v.objectlayer = 'platform'
-            table.insert(level.nodes, Platform.new(v, level.collider))
+            local node = Platform.new(v, level.collider)
+            level:addNode(node)
         end
     end
 
-    if level.map.objectgroups.wall then
-        for k,v in pairs(level.map.objectgroups.wall.objects) do
-            Wall.new(v, level.collider)
+    if level.map.objectgroups.block then
+        for k,v in pairs(level.map.objectgroups.block.objects) do
+            v.objectlayer = 'block'
+            Block.new(v, level.collider, false)
+        end
+    end
+
+    if level.map.objectgroups.ice then
+        for k,v in pairs(level.map.objectgroups.ice.objects) do
+            v.objectlayer = 'ice'
+            Block.new(v, level.collider, true)
         end
     end
 
     level.player = player
-    level:restartLevel()
     return level
 end
 
 function Level:restartLevel()
+    assert(self.name ~= "overworld","level's name cannot be overworld")
+    assert(Gamestate.currentState() ~= Gamestate.get("overworld"),"level cannot be overworld")
     self.over = false
 
     self.player = Player.factory(self.collider)
@@ -255,22 +266,20 @@ function Level:enter( previous, door, position )
         self.state = 'active'
     end)
 
-    ach:achieve('enter ' .. self.name)
-
     --only restart if it's an ordinary level
-    if previous.level or previous==Gamestate.get('overworld') then
+    if previous.isLevel or previous==Gamestate.get('overworld')
+                        or previous==Gamestate.get('flyin') then
         self.previous = previous
         self:restartLevel()
     end
-    if previous == Gamestate.get('overworld') then
+    if previous == Gamestate.get('overworld')
+                   or previous==Gamestate.get('flyin') then
         self.respawn = true
         self.player.character:respawn()
     end
     if not self.player then
         self:restartLevel()
     end
-
-    self.player:setSpriteStates('default')
 
     camera.max.x = self.map.width * self.map.tilewidth - window.width
 
@@ -303,10 +312,14 @@ function Level:enter( previous, door, position )
     end
 
     self:moveCamera()
+    self.player:moveBoundingBox()
 
-    for i,node in ipairs(self.nodes) do
+
+    for i,node in pairs(self.nodes) do
         if node.enter then node:enter(previous) end
     end
+
+    self.player:setSpriteStates(self.player.current_state_set or 'default')
 end
 
 function Level:init()
@@ -327,8 +340,6 @@ local function leaveLevel(level, levelName, doorName)
 end
 
 function Level:update(dt)
-    Tween.update(dt)
-    ach:update(dt)
 
     if self.state == 'idle' then
         self.transition:update(dt)
@@ -347,22 +358,18 @@ function Level:update(dt)
 
     -- start death sequence
     if self.player.dead and not self.over then
-        ach:achieve('die')
         sound.stopMusic()
         sound.playSfx( 'death' )
         self.over = true
         self.respawn = Timer.add(3, function()
             self.player.character:reset()
-            if self.player.lives <= 0 then
-                Gamestate.switch("gameover")
-            else
-                Gamestate.get('overworld'):reset()
-                Gamestate.switch(Level.new(self.spawn))
-            end
+            local gamesave = app.gamesaves:active()
+            local point = gamesave:get('savepoint', {level='studyroom', name='bookshelf'})
+            Gamestate.switch(point.level, point.name)
         end)
     end
 
-    for i,node in ipairs(self.nodes) do
+    for i,node in pairs(self.nodes) do
         if node.update then node:update(dt, self.player) end
     end
 
@@ -371,15 +378,22 @@ function Level:update(dt)
     self:updatePan(dt)
     self:moveCamera()
 
-    Timer.update(dt)
-
     local exited, levelName, doorName = self.events:poll('exit')
     if exited then
       leaveLevel(self, levelName, doorName)
     end
 end
 
+function Level:cameraPosition()
+    local x = self.player.position.x + self.player.width / 2
+    local y = self.player.position.y - self.map.tilewidth * 4.5
+    return math.max(x - window.width / 2, 0),
+      limit( limit(y, 0, self.offset) + self.pan, 0, self.offset )
+end
+
+
 function Level:moveCamera()
+    if not self.trackPlayer then return end
     local x = self.player.position.x + self.player.width / 2
     local y = self.player.position.y - self.map.tilewidth * 4.5
     camera:setPosition( math.max(x - window.width / 2, 0),
@@ -406,27 +420,35 @@ function Level:exit(levelName, doorName)
   end
 end
 
-
 function Level:draw()
-    self.background:draw(0, 0)
+    self.tileset:draw(0, 0, 'background')
 
     if self.player.footprint then
         self:floorspaceNodeDraw()
     else
-        for i,node in ipairs(self.nodes) do
-            if node.draw and not node.foreground then node:draw() end
+        for i,node in pairs(self.nodes) do
+            if node.draw and not node.foreground and not node.isTrigger then node:draw() end
         end
 
         self.player:draw()
 
-        for i,node in ipairs(self.nodes) do
-            if node.draw and node.foreground then node:draw() end
+        for i,node in pairs(self.nodes) do
+            if node.draw and (node.foreground or node.isLiquid) and not node.isTrigger then node:draw() end
         end
+        for i,node in pairs(self.nodes) do
+            if node.draw and node.foreground and node.isLiquid and not node.isTrigger then node:draw() end
+        end
+        
     end
     
+    self.tileset:draw(0, 0, 'foreground')
+
+    if self.scene then
+        self.scene:draw(self.player)
+    end
+
     self.player.inventory:draw(self.player.position)
     self.hud:draw( self.player )
-    ach:draw()
 
     if self.state == 'idle' then
       self.transition:draw(camera.x, camera.y, camera:getWidth(), camera:getHeight())
@@ -454,10 +476,10 @@ function Level:floorspaceNodeDraw()
             local node_depth = ( node.node and node.node.properties and node.node.properties.depth ) and node.node.properties.depth or 0
             local node_direction = ( node.node and node.node.properties and node.node.properties.direction ) and node.node.properties.direction or false
             -- base is, by default, offset by the depth
-            local node_base = node_position.y + node.height - node_depth
+            local node_base = node_position.y + (node.drawHeight or node.height) - node_depth
             -- adjust the base by the players position
             -- if on floor and not behind or in front
-            if fp.offset == 0 and node_direction and node_base < fp_base and node_position.y + node.height > fp_base then
+            if fp.offset == 0 and node_direction and node_base < fp_base and node_position.y + (node.drawHeight or node.height) > fp_base then
                 node_base = fp_base - 3
                 if ( node_direction == 'left' and player_center < node_center ) or
                    ( node_direction == 'right' and player_center > node_center ) then
@@ -491,8 +513,7 @@ function Level:floorspaceNodeDraw()
 end
 
 function Level:leave()
-    ach:achieve('leave ' .. self.name)
-    for i,node in ipairs(self.nodes) do
+    for i,node in pairs(self.nodes) do
         if node.leave then node:leave() end
         if node.collide_end then
             node:collide_end(self.player)
@@ -506,14 +527,17 @@ end
 
 function Level:keypressed( button )
     if self.state ~= 'active' then
-        return
+        return true
     end
 
-    if button == 'INTERACT' and self.player.character.state ~= 'idle' then
-        return
+    if self.player.inventory.visible then
+        self.player.inventory:keypressed( button )
+        return true
     end
 
-    for i,node in ipairs(self.nodes) do
+    --uses a copy of the nodes to eliminate a concurrency error
+    local tmpNodes = self:copyNodes()
+    for i,node in pairs(tmpNodes) do
         if node.player_touched and node.keypressed then
             if node:keypressed( button, self.player) then
               return true
@@ -525,7 +549,7 @@ function Level:keypressed( button )
       return true
     end
 
-    if button == 'START' and not self.player.dead and not self.player.controlState:is('ignorePause') then
+    if button == 'START' and not self.player.dead and self.player.health > 0 and not self.player.controlState:is('ignorePause') then
         Gamestate.switch('pause')
         return true
     end
@@ -541,7 +565,7 @@ function Level:panInit()
 end
 
 function Level:updatePan(dt)
-    if self.player.isClimbing then return end
+    if self.player.isClimbing or self.player.footprint then return end
     local up = controls.isDown( 'UP' ) and not self.player.controlState:is('ignoreMovement')
     local down = controls.isDown( 'DOWN' ) and not self.player.controlState:is('ignoreMovement')
 
@@ -574,4 +598,36 @@ function Level:updatePan(dt)
     end
 end
 
+function Level:addNode(node)
+    if node.containerLevel then
+        node.containerLevel.collider:remove(node.bb)
+        node.containerLevel:removeNode(node)
+    end
+    node.containerLevel = self
+    table.insert(self.nodes, node)
+end
+
+function Level:removeNode(node)
+    node.containerLevel = nil
+    for k,v in pairs(self.nodes) do
+        if v == node then
+            table.remove(self.nodes,k)
+            if v.collider then
+                v.collider:remove(v.bb)
+            end
+        end
+    end
+end
+
+function Level:hasNode(node)
+    return table.contains(self.nodes,node)
+end
+
+function Level:copyNodes()
+    local tmpNodes = {}
+    for i,node in pairs(self.nodes) do
+        tmpNodes[i] = node
+    end
+    return tmpNodes
+end
 return Level

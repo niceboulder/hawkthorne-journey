@@ -1,3 +1,4 @@
+local app = require 'app'
 local Gamestate = require 'vendor/gamestate'
 local window = require 'window'
 local fonts = require 'fonts'
@@ -33,7 +34,7 @@ function state:keypressed(key)
 end
 
 state.credits = {
-    'CREDITS',
+    app.i18n('credits'),
     {% for contributor in contributors -%}
     '{{contributor}}',
     {% endfor %}

@@ -3,23 +3,26 @@ local correctVersion = require 'correctversion'
 if correctVersion then
 
   require 'utils'
-  local debugger = require 'debugger'
+  local app = require 'app'
+
+  local tween = require 'vendor/tween'
   local Gamestate = require 'vendor/gamestate'
-  local Level = require 'level'
+  local sound = require 'vendor/TEsound'
+  local timer = require 'vendor/timer'
+  local cli = require 'vendor/cliargs'
+  local mixpanel = require 'vendor/mixpanel'
+
+  local debugger = require 'debugger'
   local camera = require 'camera'
   local fonts = require 'fonts'
-  local sound = require 'vendor/TEsound'
   local window = require 'window'
   local controls = require 'controls'
   local hud = require 'hud'
-  local cli = require 'vendor/cliargs'
-  local mixpanel = require 'vendor/mixpanel'
   local character = require 'character'
   local cheat = require 'cheat'
   local player = require 'player'
-
-  -- XXX Hack for level loading
-  Gamestate.Level = Level
+  local Dialog = require 'dialog'
+  local Prompt = require 'prompt'
   
   math.randomseed( os.time() )
 
@@ -49,8 +52,10 @@ if correctVersion then
     cli:add_option("-v, --vol-mute=CHANNEL", "Disable sound: all, music, sfx")
     cli:add_option("-g, --god", "Enable God Mode Cheat")
     cli:add_option("-j, --jump", "Enable High Jump Cheat")
+    cli:add_option("-s, --speed", "Enable Super Speed Cheat")
     cli:add_option("-d, --debug", "Enable Memory Debugger")
     cli:add_option("-b, --bbox", "Draw all bounding boxes ( enables memory debugger )")
+    cli:add_option("-n, --locale=LOCALE", "Local, defaults to en-US")
     cli:add_option("--console", "Displays print info")
 
     local args = cli:parse(arg)
@@ -101,12 +106,20 @@ if correctVersion then
       debugger.set( true, true )
     end
     
+    if args["locale"] ~= "" then
+      app.i18n:setLocale(args.locale)
+    end
+    
     if args["g"] then
-      cheat.god = true
+      cheat:on("god")
     end
     
     if args["j"] then
-      cheat.jump_high = true
+      cheat:on("jump_high")
+    end
+    
+    if args["s"] then
+      cheat:on("super_speed")
     end
     
     love.graphics.setDefaultImageFilter('nearest', 'nearest')
@@ -120,25 +133,59 @@ if correctVersion then
     if paused then return end
     if debugger.on then debugger:update(dt) end
     dt = math.min(0.033333333, dt)
+    if Prompt.currentPrompt then
+        Prompt.currentPrompt:update(dt)
+    end
+    if Dialog.currentDialog then
+        Dialog.currentDialog:update(dt)
+    end
+
     Gamestate.update(dt)
+    tween.update(dt > 0 and dt or 0.001)
+    timer.update(dt)
     sound.cleanup()
   end
 
   function love.keyreleased(key)
     local button = controls.getButton(key)
     if button then Gamestate.keyreleased(button) end
+
+    if not button then return end
+    
+    if Prompt.currentPrompt or Dialog.currentDialog then
+        --bypass
+    else
+        Gamestate.keyreleased(button)
+    end
   end
 
   function love.keypressed(key)
     if controls.enableRemap then Gamestate.keypressed(key) return end
     if key == 'f5' then debugger:toggle() end
+    if key == "f6" and debugger.on then debug.debug() end
     local button = controls.getButton(key)
-    if button then Gamestate.keypressed(button) end
+
+    if not button then return end
+    if Prompt.currentPrompt then
+        Prompt.currentPrompt:keypressed(button)
+    elseif Dialog.currentDialog then
+        Dialog.currentDialog:keypressed(button)
+    else
+        Gamestate.keypressed(button)
+    end
   end
 
   function love.draw()
     camera:set()
     Gamestate.draw()
+    fonts.set('arial')
+    if Dialog.currentDialog then
+        Dialog.currentDialog:draw()
+    end
+    if Prompt.currentPrompt then
+        Prompt.currentPrompt:draw()
+    end
+    fonts.revert()
     camera:unset()
 
     if paused then

@@ -5,10 +5,15 @@ full_soundtrack.ogg
 hawkthorne
 win32/*
 win64/*
-osx/love*
 redditors.txt
 src/maps/*.lua
 venv
 tmx2lua*
+bin/*
+dsa_priv.pem
 release.md
-src/conf.lua.bak
+post.md
+notes.html
+*.bak
+sparkle
+*.pyc

@@ -3,28 +3,29 @@ local Board = require "board"
 local camera = require "camera"
 local Dialog = {}
 
+
 Dialog.__index = Dialog
----
--- Create a new Dialog
--- @param message to display
--- @param callback when user answer's say
--- @return Dialog
-function Dialog.new(message, callback)
+
+Dialog.currentDialog = nil
+
+function Dialog.new(message, callback, drawable)
+  local d = Dialog.create(message)
+  d:reposition()
+  d:open(callback)
+  d.drawable = drawable
+  Dialog.currentDialog = d
+  return d
+end
+
+
+function Dialog.create(message)
     local say = {}
     setmetatable(say, Dialog)
     say.board = Board.new(312, 60)
-    say.board:open()
     say.line = 1
     say.cursor = 0
-    say.y = camera.y + camera:getHeight() - 36
+    say.y = camera.y + camera:getHeight() - 60
     say.x = camera.x + camera:getWidth() / 2
-
-    local state = gamestate.currentState()
-
-    if (state.player and state.player.position.y + state.player.height + 35 > say.y)
-       or state.floorspace then
-      say.y = camera.y + 100
-    end
 
     if type(message) == 'string' then
       say.messages = {message}
@@ -32,11 +33,26 @@ function Dialog.new(message, callback)
       say.messages = message
     end
 
-    say.callback = callback
     say.blink = 0
-    say.state = 'opened'
+    say.state = 'closed'
     say.result = false
     return say
+end
+
+function Dialog:open(callback)
+  self.callback = callback
+  Dialog.currentDialog = self
+  self.board:open()
+  self.state = 'opened'
+end
+
+function Dialog:reposition()
+  local state = gamestate.currentState()
+
+  if (state.player and state.player.position.y + state.player.height + 35 > self.y)
+     or state.floorspace then
+    self.y = camera.y + 100
+  end
 end
 
 function Dialog:bbox()
@@ -51,6 +67,7 @@ function Dialog:update(dt)
     
     if self.board.state == 'closed' and self.state ~= 'closed' then
         self.state = 'closed'
+        Dialog.currentDialog = nil
         if self.callback then self.callback(self.result) end
     end
 end
@@ -81,6 +98,10 @@ function Dialog:draw()
         local oy = math.floor(y - (14 * lines / 2))
 
         love.graphics.printf(message, ox, oy, self.board.width - 20)
+    end
+    
+    if self.drawable then
+        self.drawable:draw()
     end
 
     love.graphics.setColor( 255, 255, 255, 255 )

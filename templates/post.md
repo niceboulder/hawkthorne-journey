@@ -1,26 +1,24 @@
+**Hawkthorne Release {{version}}**
+
+-- /r/hawkthorne mods
+
+**DOWNLOAD**
+
+- [OS X](http://files.projecthawkthorne.com/releases/latest/hawkthorne-osx.zip)
+- [Windows 32-bit](http://files.projecthawkthorne.com/releases/latest/hawkthorne-win-x86.zip)
+- [Windows 64-bit](http://files.projecthawkthorne.com/releases/latest/hawkthorne-win-x64.zip)
+- [hawkthorne.love](http://files.projecthawkthorne.com/releases/latest/hawkthorne.love)
+  You'll need to install the [love](http://love2d.org) framework as well.
+
+**How can I help?**
+
+- [**Play test the game and find bugs**](https://github.com/hawkthorne/hawkthorne-journey/blob/master/CONTRIBUTING.md#playtest)
+- [Code new game features](https://github.com/hawkthorne/hawkthorne-journey/blob/master/CONTRIBUTING.md#code)
+- [Record music and sound effects](https://github.com/hawkthorne/hawkthorne-journey/blob/master/CONTRIBUTING.md#music-and-sound-effects)
+- [Draw sprites and tile sets](https://github.com/hawkthorne/hawkthorne-journey/blob/master/CONTRIBUTING.md#sprites)
+- [Create new costumes and characters](https://github.com/hawkthorne/hawkthorne-journey/blob/master/CONTRIBUTING.md#characters-and-costumes)
+
 **CHANGES**
 {% for feature in new_features %}
 - [{{ feature.title }}]({{ feature.html_url }})
 {%- endfor %}
-
-**KNOWN ISSUES**
-{% for bug in bugs %}
-- [{{ bug.title }}]({{ bug.html_url }})
-{%- endfor %}
-
-**INTERESTED IN HELPING OUT?**
-
-Take a look at the list of [open
-issues](https://github.com/kyleconroy/hawkthorne-journey/issues?milestone=1&state=open)
-that we need fixed before we can get to version 1.0.
-
-**DOWNLOAD**
-
-- [OS X](https://s3.amazonaws.com/hawkthorne.journey.builds/hawkthorne-osx.zip)
-- [Windows 32-bit](https://s3.amazonaws.com/hawkthorne.journey.builds/hawkthorne-win-x86.zip)
-- [Windows 64-bit](https://s3.amazonaws.com/hawkthorne.journey.builds/hawkthorne-win-x64.zip)
-- [hawkthorne.love](https://s3.amazonaws.com/hawkthorne.journey.builds/hawkthorne.love)
-  You'll need to install the [love](http://love2d.org) framework as well.
-
-**Found a bug? [Report it here](https://github.com/kyleconroy/hawkthorne-journey/issues?state=open)**
-

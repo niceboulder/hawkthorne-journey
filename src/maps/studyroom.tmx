@@ -54,6 +54,7 @@
     <property name="width" value="24"/>
    </properties>
   </object>
+  <object name="bookshelf" type="savepoint" x="528" y="216" width="24" height="48"/>
  </objectgroup>
  <objectgroup name="floorspace" width="29" height="14">
   <object name="table" x="112" y="275">
@@ -80,5 +81,4 @@
    <polygon points="0,0 48,-48 600,-48 648,0"/>
   </object>
  </objectgroup>
- <objectgroup name="Object Layer 3" width="29" height="14"/>
 </map>
