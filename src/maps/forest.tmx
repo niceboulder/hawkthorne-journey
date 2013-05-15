@@ -230,6 +230,7 @@
    </properties>
   </object>
   <object name="tree" type="savepoint" x="456" y="360" width="24" height="48"/>
+  <object type="diggable" x="168" y="408" width="456" height="120"/>
  </objectgroup>
  <objectgroup color="#a40098" name="platform" width="150" height="22">
   <object type="floor" x="744" y="312" width="96" height="24"/>
@@ -258,7 +259,7 @@
   <object x="3024" y="384" width="120" height="144"/>
   <object x="3192" y="384" width="168" height="144"/>
   <object x="3360" y="312" width="240" height="216"/>
-  <object x="0" y="408" width="624" height="120"/>
+  <object x="0" y="408" width="168" height="120"/>
  </objectgroup>
  <objectgroup name="welcome_to_hawkthorne" width="150" height="22">
   <object name="lightning" type="lightning" x="1477" y="118" width="48" height="192"/>
