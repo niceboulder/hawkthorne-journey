@@ -1,4 +1,4 @@
-local Dialog = require 'dialog'
+local Prompt = require 'prompt'
 
 local Note = {}
 Note.__index = Note
@@ -10,8 +10,10 @@ function Note.new(node, collider)
     setmetatable(note, Note)
     note.image = noteImage
     note.bb = collider:addRectangle(node.x, node.y, node.width, node.height)
+    note.collider = collider
     note.bb.node = note
     note.note = split( node.properties.note, '|' )
+    table.insert(note.note, "Did you get all that?")
 
     note.x = node.x
     note.y = node.y
@@ -36,13 +38,24 @@ function Note:draw()
     --self.dialog:draw( self.x, self.y - 30 )
 end
 
+function Note:die()
+    self.collider:remove(self.bb)
+    self.bb = nil
+    if self.containerLevel then
+      self.containerLevel:removeNode(self)
+    end
+end
+
 function Note:keypressed( button, player )
     
-    if button == 'INTERACT' and self.dialog == nil and not player.freeze then
+    if button == 'INTERACT' and not self.dialog and not player.freeze then
         player.freeze = true
-        Dialog.new(self.note, function()
+        Prompt.new(self.note, function(result)
             player.freeze = false
-            Dialog.currentDialog = nil
+            Prompt.currentPrompt = nil
+            if result == "Yes" then
+                self:die()
+            end
         end)
         return true
     end

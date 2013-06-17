@@ -230,6 +230,11 @@
    </properties>
   </object>
   <object name="tree" type="savepoint" x="456" y="360" width="24" height="48"/>
+  <object type="note" x="408" y="384" width="24" height="24">
+   <properties>
+    <property name="note" value="testing|123"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup color="#a40098" name="platform" width="150" height="22">
   <object x="744" y="312" width="96" height="24">
